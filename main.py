@@ -1,12 +1,12 @@
-from fastapi import FastAPI, Depends
-from fastapi import HTTPException
-from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import auth
 import jwt
 import models
 from database import engine, get_db
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 # This line creates your 'app.db' file and tables if they don't exist yet!
 models.Base.metadata.create_all(bind=engine)
@@ -14,28 +14,55 @@ models.Base.metadata.create_all(bind=engine)
 # this initializes your web application interface instance
 app = FastAPI()
 
+# --- CORS POLICY PATCH  ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows your local frontend files to connect safely
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows GET, POST, PUT, DELETE operations
+    allow_headers=["*"],  # Allows security headers and token passing
+)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
+
 # Security Dependency Function
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+):
     credentials_exception = HTTPException(
         status_code=401,
         detail="Could not validate session credentials.",
-        headers={"WWW-Authenticate": "Bearer"}
+        headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Decode the signature using your secret key parameters
+        # Print incoming token to verify the frontend is passing it cleanly
+        print(f"\n--- DEBUG LOG -> Incoming Token Received: {token[:20]}...")
+
+        # Explicitly extract payload using the proper PyJWT decoding configuration
         payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
         username: str = payload.get("sub")
+
+        print(f"--- DEBUG LOG -> Successfully Decoded Token for Username: {username}")
+
         if username is None:
+            print("--- DEBUG LOG -> Sub claim missing inside token payload.")
             raise credentials_exception
-    except jwt.PyJWTError:
-        raise credentials_exception 
+
+    except jwt.ExpiredSignatureError:
+        print("--- DEBUG LOG -> Token has expired!")
+        raise credentials_exception
+    except jwt.PyJWTError as e:
+        print(f"--- DEBUG LOG -> Token Decode Failed entirely. Error: {e}")
+        raise credentials_exception
 
     user = db.query(models.DBUser).filter(models.DBUser.username == username).first()
     if user is None:
+        print(
+            f"--- DEBUG LOG -> User '{username}' extracted from token does not exist in app.db database."
+        )
         raise credentials_exception
-    
+
     return user
 
 
@@ -53,8 +80,12 @@ def read_root():
     return {"message": "Welcome to your secure API repository!"}
 
 
-@app.post("/assets/")
-def create_asset(asset: Asset, db: Session = Depends(get_db), current_user: models.DBUser = Depends(get_current_user)):
+@app.post("/assets")
+def create_asset(
+    asset: Asset,
+    db: Session = Depends(get_db),
+    current_user: models.DBUser = Depends(get_current_user),
+):
     # Convert the incoming Pydantic validation data into a Database Model Object
     db_item = models.DBAsset(
         name=asset.name,
@@ -75,8 +106,11 @@ def create_asset(asset: Asset, db: Session = Depends(get_db), current_user: mode
     }
 
 
-@app.get("/assets/")
-def get_all_assets(db: Session = Depends(get_db), current_user: models.DBUser = Depends(get_current_user)):
+@app.get("/assets")
+def get_all_assets(
+    db: Session = Depends(get_db),
+    current_user: models.DBUser = Depends(get_current_user),
+):
 
     # Query thge database to extract every row inside the assets table
     all_assets = db.query(models.DBAsset).all()
@@ -86,7 +120,11 @@ def get_all_assets(db: Session = Depends(get_db), current_user: models.DBUser = 
 
 
 @app.get("/assets/{asset_id}")
-def get_single_asset(asset_id: int, db: Session = Depends(get_db), current_user: models.DBUser = Depends(get_current_user)):
+def get_single_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.DBUser = Depends(get_current_user),
+):
 
     # Search for an asset matching the requested ID number
     target_asset = (
@@ -103,7 +141,12 @@ def get_single_asset(asset_id: int, db: Session = Depends(get_db), current_user:
 
 
 @app.put("/assets/{asset_id}")
-def update_todo(asset_id: int, updated_asset: Asset, db: Session = Depends(get_db), current_user: models.DBUser = Depends(get_current_user)):
+def update_asset(
+    asset_id: int,
+    updated_asset: Asset,
+    db: Session = Depends(get_db),
+    current_user: models.DBUser = Depends(get_current_user),
+):
 
     # Search for the asset we want to update
     db_asset = db.query(models.DBAsset).filter(models.DBAsset.id == asset_id).first()
@@ -124,34 +167,43 @@ def update_todo(asset_id: int, updated_asset: Asset, db: Session = Depends(get_d
 
     return {"status": "Updated successfully!", "updated_item": db_asset}
 
+
 @app.delete("/assets/{asset_id}")
-def delete_asset(asset_id: int, db: Session = Depends(get_db), current_user: models.DBUser = Depends(get_current_user)):
+def delete_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.DBUser = Depends(get_current_user),
+):
 
     # Search for the target asset
     db_asset = db.query(models.DBAsset).filter(models.DBAsset.id == asset_id).first()
 
     # Defensive check: If it's not found, alert the user
     if not db_asset:
-        raise HTTPException(status_code=404, detail=f"Asset with ID {asset_id} does not exist.")
+        raise HTTPException(
+            status_code=404, detail=f"Asset with ID {asset_id} does not exist."
+        )
 
     # Delete the item from the session state and save changes
     db.delete(db_asset)
     db.commit()
 
-    return {
-        "status": "Removal finalized successfully!",
-        "deleted_asset_id": asset_id
-    }
+    return {"status": "Removal finalized successfully!", "deleted_asset_id": asset_id}
+
 
 class UserCreate(BaseModel):
     username: str
     password: str
 
+
 @app.post("/register")
+@app.post("/register/", include_in_schema=False)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
     # Check if the username already exist in the app.db file
-    existing_user = db.query(models.DBUser).filter(models.DBUser.username == user.username).first()
+    existing_user = (
+        db.query(models.DBUser).filter(models.DBUser.username == user.username).first()
+    )
 
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already taken.")
@@ -167,15 +219,24 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return {"status": "User registered successfully!"}
 
+
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+):
 
     # Look up inside the database table
-    user = db.query(models.DBUser).filter(models.DBUser.username == form_data.username).first()
+    user = (
+        db.query(models.DBUser)
+        .filter(models.DBUser.username == form_data.username)
+        .first()
+    )
 
     # Verify plain text password matches the cryptographic database hash
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid username or password credentials.")
+        raise HTTPException(
+            status_code=401, detail="Invalid username or password credentials."
+        )
 
     # Generate the signed JSON Web Token session window
     access_token = auth.create_access_token(data={"sub": user.username})

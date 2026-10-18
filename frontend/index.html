@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Secure Asset Management System</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- MASTER CONTAINER -->
+    <div class="container">
+      <!-- HEADER SECTION -->
+      <header>
+        <h1>Network Asset Tracker</h1>
+        <p id="session-status" class="status-logged-out">
+          Status: Unauthorized Connection
+        </p>
+      </header>
+
+      <!-- SECTION 1: AUTHENTICATION WINDOW (Shown by default) -->
+      <main id="auth-box" class="card">
+        <h2>Account Authentication</h2>
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            placeholder="Enter username"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Password" />
+        </div>
+
+        <div class="btn-group">
+          <button id="btn-login" class="btn-primary">Sign In</button>
+          <button id="btn-register" class="btn-secondary">
+            Register Account
+          </button>
+        </div>
+
+        <p id="auth-message" class="message"></p>
+      </main>
+
+      <!-- SECTION 2: MANAGEMENT DASHBOARD (Hidden until a valid token is verified) -->
+      <main id="dashboard-box" class="card hidden">
+        <div class="dashboard-header">
+          <h2>Asset Inventory Console</h2>
+          <button id="btn-logout" class="btn-danger">Sign Out</button>
+        </div>
+
+        <!-- Action Form: Add New Asset -->
+        <section class="asset-form-section">
+          <h3>Log New Network Asset</h3>
+          <div class="form-grid">
+            <input
+              type="text"
+              id="asset-name"
+              placeholder="Asset Name (e.g. Workstation-01)"
+            />
+            <input
+              type="text"
+              id="asset-type"
+              placeholder="Type (e.g. Server, Router)"
+            />
+            <input type="text" id="asset-ip" placeholder="IP Address" />
+            <input type="number" id="asset-port" placeholder="Port" />
+
+            <div class="btn-save-asset">
+              <button id="btn-save-asset" class="btn-success">
+                Save Asset Entry
+              </button>
+            </div>
+
+            <p id="dashboard-message" class="message"></p>
+          </div>
+        </section>
+
+        <!-- Display Section: Active Database Records -->
+        <section class="asset-list-section">
+          <h3>Active Infastructure Inventory</h3>
+          <button id="btn-refresh" class="btn-refresh">Refresh List</button>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Asset Name</th>
+                  <th>Asset Type</th>
+                  <th>IP Address</th>
+                  <th>Active Port</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="asset-table-body" class="asset-table-body">
+                <!-- JavaScript will automatically inject structural rows right here live -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
