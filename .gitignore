@@ -1,0 +1,13 @@
+# Ignore the Python's virtual environment
+venv/
+.venv/
+__pycache__
+*.pyc
+
+# Ignore Local database files
+app.db
+
+# Ignore local workspace or configuration cache
+.vscode/
+.idea/
+pyrightconfig.json
